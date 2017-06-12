@@ -12,6 +12,10 @@ class MPC {
 
   virtual ~MPC();
 
+  std::vector<double> predicted_trajectory_xs;
+  std::vector<double> predicted_trajectory_ys;
+  std::vector<double> prev_actuations;
+
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuatotions.
   vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs);
