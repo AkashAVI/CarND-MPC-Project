@@ -8,8 +8,8 @@ using CppAD::AD;
 // The code havily reused from mpc quiz from the lesson
 
 // Set the timestep length and duration
-size_t N = 10;
-double dt = 0.1;
+size_t N = 12;
+double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -22,7 +22,6 @@ double dt = 0.1;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
-double ref_v = 60;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -41,7 +40,11 @@ class FG_eval {
  public:
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
-  FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+  double ref_v;
+  FG_eval(Eigen::VectorXd coeffs, double ref_v) :
+    coeffs(coeffs),
+    ref_v(ref_v)
+  {}
 
   typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
   void operator()(ADvector& fg, const ADvector& vars) {
@@ -56,10 +59,11 @@ class FG_eval {
         + CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     for (int t = 1; t<N-1; t++) {
-      fg [0] += CppAD::pow(vars[delta_start + t], 2)
+      fg [0] +=
+          CppAD::pow(vars[delta_start + t], 2)
         + CppAD::pow(vars[a_start + t], 2)
-        + 200 * CppAD::pow(vars[delta_start + t] - vars[delta_start + t - 1], 2);
-//        + CppAD::pow(vars[a_start + t] - vars[a_start + t - 1], 2);
+        + 1000 * CppAD::pow(vars[delta_start + t] - vars[delta_start + t - 1], 2)
+        + 100 * CppAD::pow(vars[a_start + t] - vars[a_start + t - 1], 2);
     }
 
     //
@@ -124,6 +128,14 @@ MPC::MPC() {
 }
 MPC::~MPC() {}
 
+void MPC::set_latency(double latency) {
+  latency_ = latency;
+}
+
+void MPC::set_velocity (double velocity) {
+  ref_v_ = velocity;
+}
+
 vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
@@ -186,10 +198,16 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     vars_upperbound[i] = 1.0;
   }
 
-  vars_lowerbound [delta_start] = prev_actuations [0];
-  vars_upperbound [delta_start] = prev_actuations [0];
-  vars_lowerbound [a_start] = prev_actuations [1];
-  vars_upperbound [a_start] = prev_actuations [1];
+  // to handle delay before we actually may control the car
+  // we need to freeze control commands with previous values
+  // during latency delay
+  int actuations_after_delay_index = int(std::ceil(latency_ / dt));
+  for (int i=0; i < actuations_after_delay_index; i++) {
+    vars_lowerbound [delta_start + i] = prev_actuations [0];
+    vars_upperbound [delta_start + i] = prev_actuations [0];
+    vars_lowerbound [a_start + i] = prev_actuations [1];
+    vars_upperbound [a_start + i] = prev_actuations [1];
+  }
 
   // Lower and upper limits for the constraints
   // Should be 0 besides initial state.
@@ -215,7 +233,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   constraints_upperbound[epsi_start] = epsi;
 
   // object that computes objective and constraints
-  FG_eval fg_eval(coeffs);
+  FG_eval fg_eval(coeffs, ref_v_);
 
   //
   // NOTE: You don't have to worry about these options
@@ -248,7 +266,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "status " << solution.status << " Cost " << cost << std::endl;
+//  std::cout << "status " << solution.status << " Cost " << cost << std::endl;
 
   for (int i=0; i<N; i++) {
     predicted_trajectory_xs [i] = solution.x [x_start + i];
@@ -260,8 +278,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  double delta = solution.x[delta_start + 1];
-  double a = solution.x[a_start + 1];
+  double delta = solution.x[delta_start + actuations_after_delay_index];
+  double a = solution.x[a_start + actuations_after_delay_index];
   prev_actuations [0] = delta;
   prev_actuations [1] = a;
   return {delta / 0.436332, a};

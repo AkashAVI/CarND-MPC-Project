@@ -79,6 +79,9 @@ int main() {
 
   // MPC is initialized here!
   MPC mpc;
+  // set latency delay
+  mpc.set_latency(0.1);
+  mpc.set_velocity(70);
 
   h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -101,10 +104,8 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          cout << "pts: " << ptsx.size() << " " << ptsy.size() << endl;
-
-          Eigen::VectorXd ptsx_car_frame (ptsx.size());// = Eigen::VectorXd::Map(ptsx.data(), ptsx.size());
-          Eigen::VectorXd ptsy_car_frame (ptsy.size());// = Eigen::VectorXd::Map(ptsy.data(), ptsy.size());
+          Eigen::VectorXd ptsx_car_frame (ptsx.size());
+          Eigen::VectorXd ptsy_car_frame (ptsy.size());
           for (int i=0; i<ptsx.size(); i++) {
             double x = ptsx[i] - px;
             double y = ptsy[i] - py;
@@ -113,7 +114,6 @@ int main() {
           }
 
           auto coeffs = polyfit(ptsx_car_frame, ptsy_car_frame, 3);
-          cout << "coeffs: " << coeffs[3] << " " << coeffs[2] << " " << coeffs[1] << " " << coeffs[0] << endl;
 
           // in car frame coords of the car is (0, 0) with psi == 0
           double cte = polyeval (coeffs, 0);
@@ -121,7 +121,6 @@ int main() {
 
           Eigen::VectorXd state(6);
           state << 0, 0, 0, v, cte, epsi;
-          std::cout << "state: " << std::endl << state << std::endl;
 
           /*
           * Calculate steering angle and throttle using MPC.
@@ -141,8 +140,6 @@ int main() {
           cout << "control: " << steer_value << " " << throttle_value << endl;
 
           //Display the MPC predicted trajectory 
-//          vector<double> mpc_x_vals;
-//          vector<double> mpc_y_vals;
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -151,8 +148,6 @@ int main() {
           msgJson["mpc_y"] = mpc.predicted_trajectory_ys;//mpc_y_vals;
 
           //Display the waypoints/reference line
-//          vector<double> next_x_vals(ptsx_car_frame.data(), ptsx_car_frame.data() + ptsx_car_frame.size());
-//          vector<double> next_y_vals(ptsy_car_frame.data(), ptsy_car_frame.data() + ptsy_car_frame.size());
           vector<double> next_x_vals(10);
           vector<double> next_y_vals(10);
           for (int i=0; i<10; i++) {
