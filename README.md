@@ -20,7 +20,8 @@ This is project 5 of Term 2 of Udacity Self-Driving Car Nanodegree. Program cont
 Vector of (x, y, psi, v) is car state that changes through time and by influence of actuators (delta, a) that MPC applies to the model. So MPC optimize current and future actuators to keep states in desired values using following loss function:
 
 ```
-Loss = cte^2 + (epsi)^2 + (v - v_desired)^2 + delta^2 + a^2 + 1000 * (delta - delta_prev)^2 + 100 * (a - a_prev)^2
+Loss = cte^2 + (epsi)^2 + (v - v_desired)^2 + delta^2 +
+       a^2 + 1000 * (delta - delta_prev)^2 + 100 * (a - a_prev)^2
 ```
 
 * cte - cross track error
