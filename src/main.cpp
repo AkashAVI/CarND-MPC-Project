@@ -117,7 +117,7 @@ int main() {
 
           // in car frame coords of the car is (0, 0) with psi == 0
           double cte = polyeval (coeffs, 0);
-          double epsi = atan(polyeval (coeffs, 0));
+          double epsi = atan(polyeval_deriv (coeffs, 0));
 
           Eigen::VectorXd state(6);
           state << 0, 0, 0, v, cte, epsi;
